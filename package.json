@@ -5,6 +5,7 @@
   "private": true,
   "type": "module",
   "main": "desktop/main.js",
+  "desktopName": "charger-pet.desktop",
   "author": {
     "name": "jaisudhakar"
   },
@@ -79,9 +80,7 @@
       "category": "Utility",
       "icon": "icons/icon-512.png",
       "maintainer": "jaisudhakar",
-      "synopsis": "Animated 3D pet in your top bar that reacts to charging",
-      "desktopName": "charger-pet.desktop",
-      "syncDesktopName": true
+      "synopsis": "Animated 3D pet in your top bar that reacts to charging"
     }
   }
 }
