@@ -1,9 +1,8 @@
-// Renders the tray / top-bar icon: a tiny 3D hero acting out the battery state while
-// standing on a mini charge icon. Frames are sent to the Electron main process, which
-// swaps them into the tray at a few frames per second (like RunCat).
+// Renders the tray / top-bar icon: a tiny 3D pet acting out the battery state while
+// standing on a mini charge icon. The cat gallops in place while charging, like RunCat.
+// Frames are sent to the Electron main process, which swaps them into the tray.
 import * as THREE from 'three';
-import { HEROES, buildHero, applyPose, updateHero } from '../js/characters.js';
-import { Director } from '../js/activities.js';
+import { PETS, DEFAULT_PET, createPet, isCat, findPet } from '../js/pets.js';
 
 const bridge = window.chargerPetDesktop;
 const params = new URLSearchParams(location.search);
@@ -12,6 +11,12 @@ const FPS = Number(params.get('fps')) || 10;
 let dark = params.get('dark') !== '0';
 
 // Small activities only: big jumps and flips would leave the icon frame.
+const CAT_TRAY_POOLS = {
+  charging: ['run'],
+  full: ['happy', 'sit', 'groom', 'happy'],
+  battery: ['sit', 'groom', 'walk', 'stretch', 'sit'],
+  low: ['sleep', 'mope', 'sleep'],
+};
 const TRAY_POOLS = {
   charging: ['dance', 'cheer', 'run', 'spin', 'powerup', 'pump', 'wave', 'dance'],
   full: ['cheer', 'dance', 'spin', 'wave'],
@@ -48,25 +53,43 @@ const out = document.getElementById('preview');
 out.width = out.height = SIZE;
 const g = out.getContext('2d');
 
-const director = new Director({ pools: TRAY_POOLS });
-director.ctx.track = 0.32;
 
 let rig = null;
-let heroId = params.get('hero') || 'volt';
+let heroId = params.get('hero') || DEFAULT_PET;
 const rigs = new Map();
 
 function setHero(id) {
-  const def = HEROES.find((h) => h.id === id) ?? HEROES[1];
+  const def = findPet(id) ?? findPet(DEFAULT_PET);
   heroId = def.id;
   if (rig) scene.remove(rig.root);
-  if (!rigs.has(def.id)) rigs.set(def.id, buildHero(def));
+  if (!rigs.has(def.id)) {
+    rigs.set(def.id, createPet(def, {
+      heroPools: TRAY_POOLS,
+      catPools: CAT_TRAY_POOLS,
+      track: 0.32,
+      inPlace: true,
+      facing: Math.PI / 2 - 0.35, // cat side-on, running to the right
+      runHz: 2, // about five frames per stride at tray frame rates
+    }));
+  }
   rig = rigs.get(def.id);
   scene.add(rig.root);
-  director.ctx.legLen = rig.legLen;
-  // Frame the hero: feet on the bottom edge, head + accessories inside the top.
-  const top = (rig.height + (def.topExtra ?? 0.1) * 0.7) * (def.scale ?? 1) + 0.12;
-  // Wide heroes (raised arms) need a bigger frame so they are not clipped at the sides.
-  const reach = (def.arms.x + def.arms.len + (def.arms.hand ?? 0.1)) * (def.scale ?? 1);
+  rig.director.setMode(mode());
+  const scale = def.scale ?? 1;
+  let top;
+  let reach;
+  let cx = 0;
+  if (isCat(def)) {
+    // Side-on cat: wider than tall, nose to the right, tail to the left.
+    top = rig.height * scale + 0.06;
+    reach = 0.98 * scale;
+    cx = -0.06 * scale;
+  } else {
+    // Hero: feet on the bottom edge, head + accessories inside the top. Raised arms
+    // need a wider frame so they are not clipped at the sides.
+    top = (rig.height + (def.topExtra ?? 0.1) * 0.7) * scale + 0.12;
+    reach = (def.arms.x + def.arms.len + (def.arms.hand ?? 0.1)) * scale;
+  }
   const half = Math.max(top / 2, reach * (PET_H / SIZE));
   camera.left = -half * (SIZE / PET_H);
   camera.right = half * (SIZE / PET_H);
@@ -74,10 +97,10 @@ function setHero(id) {
   camera.bottom = -half;
   // A slight top-down view for a 3D feel.
   const pitch = 0.16;
-  camera.position.set(0, half + Math.sin(pitch) * 10, Math.cos(pitch) * 10);
-  camera.lookAt(0, half, 0);
+  camera.position.set(cx, half + Math.sin(pitch) * 10, Math.cos(pitch) * 10);
+  camera.lookAt(cx, half, 0);
   camera.updateProjectionMatrix();
-  director.play('cheer', 1.6);
+  rig.director.play('cheer', 1.6);
 }
 
 // ------------------------------------------------------------------ battery
@@ -92,8 +115,8 @@ async function initBattery() {
       const plugged = !state.charging && b.charging;
       state.level = b.level;
       state.charging = b.charging;
-      director.setMode(mode());
-      if (plugged) director.play('cheer', 2.4);
+      rig?.director.setMode(mode());
+      if (plugged) rig?.director.play('cheer', 2.4);
       bridge?.battery({
         level: b.level,
         charging: b.charging,
@@ -177,9 +200,7 @@ let t = 0;
 function tick() {
   const dt = 1 / FPS;
   t += dt;
-  const pose = director.update(dt);
-  applyPose(rig, pose, t);
-  updateHero(rig, t, dt, Math.max(pose.energy, state.charging ? 0.3 : 0));
+  rig.animate(dt, t, state.charging ? 0.3 : 0);
   g.clearRect(0, 0, SIZE, SIZE);
   drawBattery(t);
   if (gl) {
@@ -193,9 +214,9 @@ bridge?.onSetHero((id) => setHero(id));
 bridge?.onTheme((isDark) => (dark = isDark));
 
 setHero(heroId);
-bridge?.heroes(HEROES.map((h) => ({ id: h.id, name: h.name, power: h.power })));
+bridge?.heroes(PETS.map((h) => ({ id: h.id, name: h.name, power: h.power, kind: h.kind ?? 'hero' })));
 await initBattery();
 setInterval(tick, 1000 / FPS);
 
 // Handle for automated checks.
-window.trayPet = { setHero, state, director, tick, canvas: out, currentHero: () => heroId };
+window.trayPet = { setHero, state, get director() { return rig.director; }, tick, canvas: out, currentHero: () => heroId };

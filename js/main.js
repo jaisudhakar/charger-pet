@@ -3,8 +3,8 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { HEROES, buildHero, applyPose, updateHero } from './characters.js';
-import { Director, ACTIVITIES, neutralPose } from './activities.js';
+import { PETS as HEROES, DEFAULT_PET, createPet, isCat } from './pets.js';
+import { ACTIVITIES } from './activities.js';
 import { ChargerIcon } from './charger.js';
 import { Particles } from './particles.js';
 import { BatteryMonitor, formatDuration } from './battery.js';
@@ -19,7 +19,7 @@ const FOV = 36;
 // ---------------------------------------------------------------- settings
 const SETTINGS_KEY = 'charger-pet:v1';
 const settings = {
-  hero: 'volt',
+  hero: DEFAULT_PET,
   demo: false,
   transformOnPlug: true,
   keepAwake: true,
@@ -28,6 +28,11 @@ const settings = {
 try {
   Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'));
 } catch {}
+// v2 made the cat the default pet.
+if ((settings.version ?? 1) < 2) {
+  settings.hero = DEFAULT_PET;
+  settings.version = 2;
+}
 function saveSettings() {
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
@@ -150,8 +155,24 @@ pet.position.y = charger.top;
 scene.add(pet);
 
 const rigs = new Map();
+let mode = 'battery';
 function getRig(id) {
-  if (!rigs.has(id)) rigs.set(id, buildHero(HEROES.find((h) => h.id === id)));
+  if (!rigs.has(id)) {
+    const def = HEROES.find((h) => h.id === id);
+    const r = createPet(def, { track: charger.halfWidth - (isCat(def) ? 0.85 : 0.55) });
+    r.director.ctx.onBeat = () => {
+      charger.bump(0.6);
+      const p = new THREE.Vector3();
+      r.hands[0].getWorldPosition(p);
+      particles.burst(p, r.def.fx.colors, 6, 1.2);
+    };
+    r.director.onActivity = (name, label) => {
+      if (r !== rig) return;
+      $('activity').textContent = label;
+      if (name === 'sleep') say('Zzz…', 3, 'sleepy');
+    };
+    rigs.set(id, r);
+  }
   return rigs.get(id);
 }
 
@@ -159,19 +180,14 @@ let heroIndex = Math.max(0, HEROES.findIndex((h) => h.id === settings.hero));
 let rig = getRig(HEROES[heroIndex].id);
 pet.add(rig.root);
 
-const director = new Director();
-director.ctx.track = charger.halfWidth - 0.55;
-director.ctx.legLen = rig.legLen;
-director.ctx.onBeat = () => {
-  charger.bump(0.6);
-  const p = new THREE.Vector3();
-  rig.hands[0].getWorldPosition(p);
-  particles.burst(p, rig.def.fx.colors, 6, 1.2);
-};
-director.onActivity = (name, label) => {
-  $('activity').textContent = label;
-  if (name === 'sleep') say('Zzz…', 3, 'sleepy');
-};
+// Hands the stage over to another pet, carrying the current battery mood along.
+function mountRig(next) {
+  pet.remove(rig.root);
+  rig = next;
+  pet.add(rig.root);
+  rig.director.setMode(mode);
+  rig.director.play(rig.director.current); // refreshes the activity label
+}
 
 let transform = null; // { t, from, to }
 
@@ -185,10 +201,7 @@ function switchHero(index, { animate = true, remote = false } = {}) {
   if (!remote) desktop?.heroChanged(settings.hero);
   updateHeroUI();
   if (!animate) {
-    pet.remove(rig.root);
-    rig = to;
-    pet.add(rig.root);
-    director.ctx.legLen = rig.legLen;
+    mountRig(to);
     return;
   }
   transform = { t: 0, from: rig, to, swapped: false };
@@ -203,22 +216,18 @@ function updateTransform(dt) {
   if (!transform.swapped) {
     const k = Math.min(1, t / 0.28);
     rig.scaler.scale.setScalar((rig.def.scale ?? 1) * (1 - k * 0.9));
-    rig.root.rotation.y += dt * 25;
+    transform.spin = (transform.spin ?? 0) + dt * 25;
+    rig.root.rotation.y += transform.spin;
     if (k >= 1) {
-      const x = rig.root.position.x;
-      pet.remove(rig.root);
       rig.scaler.scale.setScalar(rig.def.scale ?? 1);
-      rig = transform.to;
-      rig.root.position.x = x;
-      pet.add(rig.root);
-      director.ctx.legLen = rig.legLen;
+      mountRig(transform.to);
       transform.swapped = true;
       flashMat.color.set(rig.def.colors.glow);
       shockMat.color.set(rig.def.colors.glow);
       particles.burst(center, [...rig.def.fx.colors, 0xffffff], 70, 4);
       document.body.classList.add('flash');
       setTimeout(() => document.body.classList.remove('flash'), 120);
-      director.play('cheer', 2.2);
+      rig.director.play('cheer', 2.2);
       say(rig.def.lines[0], 2.4);
     }
   } else {
@@ -331,31 +340,32 @@ function onBattery(e) {
   const { plugged, unplugged } = e.detail ?? {};
   charger.setLevel(battery.level);
   charger.setCharging(battery.charging);
-  const mode = battery.mode;
+  mode = battery.mode;
   if (mode !== lastMode) {
     paintBackground(mode);
     ringMat.emissive.set(mode === 'low' ? 0xff3b4a : mode === 'battery' ? 0x7a6bff : 0x3dff7a);
     rim.color.set(mode === 'low' ? 0xff5a7a : mode === 'battery' ? 0x8a7dff : 0x58ffd0);
     if (lastMode !== null && mode === 'full' && !plugged) say(pick(LINES.full), 3);
     lastMode = mode;
-    director.setMode(mode);
+    rig.director.setMode(mode);
   }
   if (plugged) {
     sfx.plug();
     const p = new THREE.Vector3(charger.terminalX + 0.2, charger.top - 0.7, 0);
     particles.burst(p, [0x3dff7a, 0xfff27a, 0xffffff], 50, 3);
     charger.bump(1.2);
-    if (settings.transformOnPlug && !firstSync && !desktop) {
+    // Cats just celebrate; heroes transform into another random hero.
+    if (settings.transformOnPlug && !firstSync && !desktop && !isCat(HEROES[heroIndex])) {
       let next = heroIndex;
-      while (next === heroIndex) next = (Math.random() * HEROES.length) | 0;
+      while (next === heroIndex || isCat(HEROES[next])) next = (Math.random() * HEROES.length) | 0;
       switchHero(next);
     } else {
-      director.play('cheer', 2.6);
+      rig.director.play('cheer', 2.6);
       say(pick(LINES.plug), 2.6);
     }
   } else if (unplugged) {
     sfx.unplug();
-    director.play('sad', 2.5);
+    rig.director.play('sad', 2.5);
     say(pick(LINES.unplug), 2.6);
   }
   updateHud();
@@ -514,7 +524,7 @@ canvas.addEventListener('pointerup', (e) => {
   const hits = raycaster.intersectObject(rig.root, true);
   if (hits.length) {
     sfx.boop();
-    director.play(Math.random() < 0.5 ? 'jump' : 'cheer', 1.8);
+    rig.director.play(Math.random() < 0.5 ? 'jump' : 'cheer', 1.8);
     say(pick(rig.def.lines), 2.2);
     rig.anchors.body.getWorldPosition(tmpV);
     particles.burst(tmpV, rig.def.fx.colors, 24, 2);
@@ -568,16 +578,14 @@ function renderThumbnails() {
     s.add(d);
     const cam = new THREE.PerspectiveCamera(30, 1, 0.1, 20);
     const out = [];
-    const pose = neutralPose();
     for (const h of HEROES) {
       const rg = getRig(h.id);
       const parent = rg.root.parent;
       s.add(rg.root);
-      applyPose(rg, pose, 0);
-      updateHero(rg, 0, 0, 0);
+      rg.restPose();
       const top = rg.height + 0.15;
-      const midY = top * 0.62;
-      cam.position.set(0.5, midY + 0.25, top * 2.1);
+      const midY = top * (isCat(h) ? 0.5 : 0.62);
+      cam.position.set(0.5, midY + 0.25, top * (isCat(h) ? 2.6 : 2.1));
       cam.lookAt(0, midY, 0);
       r.render(s, cam);
       out.push(r.domElement.toDataURL('image/png'));
@@ -601,11 +609,7 @@ function frame() {
 
   battery.tick(dt);
 
-  const pose = director.update(dt);
-  if (transform && !transform.swapped) pose.rotY = rig.root.rotation.y;
-  applyPose(rig, pose, t);
-  const energy = Math.max(pose.energy, battery.charging ? 0.25 : 0);
-  updateHero(rig, t, dt, energy);
+  const energy = rig.animate(dt, t, battery.charging ? 0.25 : 0);
   updateTransform(dt);
   emitHeroFx(dt, energy);
 
@@ -672,4 +676,4 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:' && !desktop) {
 }
 
 // Expose a tiny handle for debugging and automated checks.
-window.chargerPet = { battery, switchHero, director, ACTIVITIES, get hero() { return HEROES[heroIndex].id; } };
+window.chargerPet = { battery, switchHero, get director() { return rig.director; }, ACTIVITIES, get hero() { return HEROES[heroIndex].id; } };

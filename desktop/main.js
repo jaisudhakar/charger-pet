@@ -32,11 +32,20 @@ if (!app.requestSingleInstanceLock()) app.quit();
 
 // ------------------------------------------------------------------ settings
 const settingsFile = () => join(app.getPath('userData'), 'settings.json');
-const settings = { hero: 'volt', popupOnPlug: true, transformOnPlug: true, openAtLogin: false };
+const DEFAULT_PET = 'ginger';
+const settings = { version: 2, hero: DEFAULT_PET, popupOnPlug: true, transformOnPlug: true, openAtLogin: false };
 function loadSettings() {
+  let saved = null;
   try {
-    Object.assign(settings, JSON.parse(fs.readFileSync(settingsFile(), 'utf8')));
+    saved = JSON.parse(fs.readFileSync(settingsFile(), 'utf8'));
+    Object.assign(settings, saved);
   } catch {}
+  // v2 made the cat the default pet.
+  if (saved && (saved.version ?? 1) < 2) {
+    settings.hero = DEFAULT_PET;
+    settings.version = 2;
+    saveSettings();
+  }
 }
 function saveSettings() {
   try {
@@ -52,6 +61,8 @@ let popup = null;
 let popupAutoHide = null;
 let heroes = [];
 const battery = { level: 1, charging: false, known: false };
+
+const isCatId = (id) => heroes.find((h) => h.id === id)?.kind === 'cat';
 
 function heroName(id) {
   return heroes.find((h) => h.id === id)?.name ?? 'Charger Pet';
@@ -181,15 +192,15 @@ function buildMenu() {
     { label: `${heroName(settings.hero)} — ${statusText()}`, enabled: false },
     { type: 'separator' },
     { label: 'Show Charger Pet', click: () => showPopup() },
-    {
-      label: 'Hero',
-      submenu: heroes.map((h, i) => ({
+    ...['cat', 'hero'].map((kind) => ({
+      label: kind === 'cat' ? 'Cat' : 'Hero',
+      submenu: heroes.filter((h) => (h.kind ?? 'hero') === kind).map((h, i) => ({
         label: `${i + 1}. ${h.name} — ${h.power}`,
         type: 'radio',
         checked: h.id === settings.hero,
         click: () => setHero(h.id),
       })),
-    },
+    })),
     { label: 'Transform to a random hero', click: () => setHero(randomHero()) },
     { type: 'separator' },
     {
@@ -199,7 +210,7 @@ function buildMenu() {
       click: (item) => { settings.popupOnPlug = item.checked; saveSettings(); },
     },
     {
-      label: 'Transform when the charger is connected',
+      label: 'Heroes transform when the charger is connected',
       type: 'checkbox',
       checked: settings.transformOnPlug,
       click: (item) => { settings.transformOnPlug = item.checked; saveSettings(); },
@@ -227,7 +238,7 @@ function refreshMenu() {
 }
 
 function randomHero() {
-  const others = heroes.filter((h) => h.id !== settings.hero);
+  const others = heroes.filter((h) => h.id !== settings.hero && h.kind !== 'cat');
   return others.length ? others[(Math.random() * others.length) | 0].id : settings.hero;
 }
 
@@ -268,7 +279,7 @@ ipcMain.on('pet:frame', (e, dataUrl) => {
 ipcMain.on('pet:heroes', (e, list) => {
   if (e.sender !== spriteWin?.webContents || !Array.isArray(list)) return;
   heroes = list;
-  if (!heroes.some((h) => h.id === settings.hero)) settings.hero = heroes[0]?.id ?? 'volt';
+  if (!heroes.some((h) => h.id === settings.hero)) settings.hero = heroes[0]?.id ?? DEFAULT_PET;
   refreshMenu();
 });
 
@@ -279,7 +290,8 @@ ipcMain.on('pet:battery', (e, s) => {
   battery.charging = Boolean(s.charging);
   battery.known = true;
   if (plugged) {
-    if (settings.transformOnPlug) setHero(randomHero());
+    // Cats just celebrate (the pages handle that); heroes transform.
+    if (settings.transformOnPlug && !isCatId(settings.hero)) setHero(randomHero());
     if (settings.popupOnPlug) showPopup({ auto: true });
   }
   refreshMenu();
