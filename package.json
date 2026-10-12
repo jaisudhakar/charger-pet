@@ -16,7 +16,7 @@
     "url": "https://github.com/jaisudhakar/charger-pet.git"
   },
   "scripts": {
-    "start": "electron .",
+    "start": "node scripts/start.mjs",
     "test": "node --test",
     "build:gnome": "node scripts/build-gnome.mjs",
     "sprites": "node tools/sprites/render.mjs",

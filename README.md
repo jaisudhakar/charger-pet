@@ -62,7 +62,7 @@ The cat lives in the tray (Windows) or menu bar (macOS). From there you can:
 
 ```bash
 npm install
-npm start            # run the Windows/macOS/Linux app from source
+npm start            # run the Windows/macOS/Linux app from source (on Ubuntu, use the extension below)
 npm test             # brain tests
 npm run build:gnome  # rebuild the GNOME extension after changing its sources
 bash scripts/install-ubuntu.sh   # install the GNOME extension from this checkout
@@ -76,6 +76,10 @@ bash scripts/install-ubuntu.sh   # install the GNOME extension from this checkou
 | `sprites/<cat>/` | Pre-rendered animation frames (128×128) |
 | `tools/sprites/` | The 3D cat model and the renderer that makes the sprites (`npm run sprites`, needs Playwright) |
 | `scripts/` | Ubuntu install/uninstall scripts and the GNOME build |
+
+On Linux, `npm start` runs Electron without its sandbox when `chrome-sandbox` isn't
+setuid root (Ubuntu 23.10+ blocks the other sandbox mode). Installed builds don't need
+this.
 
 Releases are built by the **Build and release** workflow (Actions tab → Run workflow),
 which publishes `v<version from package.json>`.
