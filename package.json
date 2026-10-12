@@ -1,11 +1,11 @@
 {
-  "name": "charger-pet",
-  "version": "1.0.0",
-  "description": "A 3D charging pet: a RunCat-style cat (and ten heroes) living next to your battery icon, reacting when you plug in.",
+  "name": "cursor-cat",
+  "version": "2.0.0",
+  "description": "A 3D cat that chases your mouse pointer around the screen. Windows, macOS and Ubuntu.",
   "private": true,
   "type": "module",
-  "main": "desktop/main.js",
-  "desktopName": "charger-pet.desktop",
+  "main": "app/main.js",
+  "desktopName": "cursor-cat.desktop",
   "author": {
     "name": "jaisudhakar"
   },
@@ -16,28 +16,22 @@
     "url": "https://github.com/jaisudhakar/charger-pet.git"
   },
   "scripts": {
-    "start": "node scripts/serve.mjs",
-    "desktop": "electron .",
+    "start": "electron .",
+    "test": "node --test",
+    "build:gnome": "node scripts/build-gnome.mjs",
+    "sprites": "node tools/sprites/render.mjs",
     "dist": "electron-builder --publish never",
-    "dist:linux": "electron-builder --linux --publish never",
     "dist:win": "electron-builder --win --publish never",
-    "dist:mac": "electron-builder --mac --publish never"
-  },
-  "devDependencies": {
-    "electron": "43.7.5",
-    "electron-builder": "26.16.1"
+    "dist:mac": "electron-builder --mac --publish never",
+    "dist:linux": "electron-builder --linux --publish never"
   },
   "build": {
-    "appId": "com.jaisudhakar.chargerpet",
-    "productName": "Charger Pet",
+    "appId": "com.jaisudhakar.cursorcat",
+    "productName": "Cursor Cat",
     "files": [
-      "index.html",
-      "manifest.webmanifest",
-      "css/**",
-      "js/**",
-      "icons/**",
-      "vendor/**",
-      "desktop/**",
+      "app/**",
+      "shared/**",
+      "sprites/**",
       "package.json"
     ],
     "directories": {
@@ -51,17 +45,10 @@
             "arm64",
             "x64"
           ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "arm64",
-            "x64"
-          ]
         }
       ],
       "category": "public.app-category.entertainment",
-      "icon": "icons/icon-512.png",
+      "icon": "app/icons/icon.png",
       "extendInfo": {
         "LSUIElement": true
       }
@@ -71,7 +58,7 @@
         "nsis",
         "portable"
       ],
-      "icon": "icons/icon-512.png"
+      "icon": "app/icons/icon.png"
     },
     "nsis": {
       "oneClick": false,
@@ -79,13 +66,16 @@
     },
     "linux": {
       "target": [
-        "AppImage",
-        "deb"
+        "AppImage"
       ],
       "category": "Utility",
-      "icon": "icons/icon-512.png",
-      "maintainer": "jaisudhakar",
-      "synopsis": "Animated 3D pet in your top bar that reacts to charging"
+      "icon": "app/icons/icon.png",
+      "maintainer": "jaisudhakar"
     }
+  },
+  "devDependencies": {
+    "electron": "43.7.5",
+    "electron-builder": "26.16.1",
+    "three": "0.170.0"
   }
 }

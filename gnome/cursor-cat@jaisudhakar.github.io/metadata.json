@@ -1,0 +1,14 @@
+{
+  "uuid": "cursor-cat@jaisudhakar.github.io",
+  "name": "Cursor Cat",
+  "description": "A 3D cat that chases your mouse pointer around the screen. When it catches up it sits, grooms, yawns and naps.",
+  "shell-version": [
+    "45",
+    "46",
+    "47",
+    "48",
+    "49"
+  ],
+  "url": "https://github.com/jaisudhakar/charger-pet",
+  "version": 1
+}

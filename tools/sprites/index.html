@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Cursor Cat sprite renderer</title>
+  <script type="importmap">
+    { "imports": { "three": "/node_modules/three/build/three.module.js" } }
+  </script>
+</head>
+<body style="margin:0;background:#222">
+  <!-- Renders every sprite frame of the cat. Driven by tools/sprites/render.mjs. -->
+  <script type="module">
+    import * as THREE from 'three';
+    import { buildCat, applyPose, POSES } from './cat-model.js';
+    import { SPRITE, DIRECTIONS, ANIMS } from '/shared/brain.js';
+
+    const S = SPRITE.size;
+    const SS = 3; // supersampling
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+    renderer.setPixelRatio(1);
+    renderer.setSize(S * SS, S * SS, false);
+    renderer.setClearColor(0x000000, 0);
+    renderer.toneMapping = THREE.NeutralToneMapping;
+
+    const scene = new THREE.Scene();
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x4a5578, 1.8));
+    const key = new THREE.DirectionalLight(0xffffff, 2.2);
+    key.position.set(-2, 5, 4);
+    scene.add(key);
+
+    // Looking down at the desktop "floor" at 30°, so screen-up is away from the viewer.
+    // One fixed camera for every frame: same scale and the feet always at the anchor.
+    const HALF = 0.95;
+    const camera = new THREE.OrthographicCamera(-HALF, HALF, HALF, -HALF, 0.1, 50);
+    const elev = THREE.MathUtils.degToRad(30);
+    camera.position.set(0, Math.sin(elev) * 10, Math.cos(elev) * 10);
+    camera.lookAt(0, 0, 0);
+    const shift = ((SPRITE.anchorY - S / 2) / S) * 2 * HALF;
+    camera.top += shift;
+    camera.bottom += shift;
+    camera.updateProjectionMatrix();
+
+    // Screen direction → cat yaw. Screen x = world x, screen down = world +z.
+    const yawFor = (dir) => {
+      const a = DIRECTIONS.indexOf(dir) * (Math.PI / 4);
+      return Math.atan2(Math.cos(a), Math.sin(a));
+    };
+    const IDLE_YAW = 0.45; // resting poses face the viewer, turned a little
+
+    const out = document.createElement('canvas');
+    out.width = out.height = S;
+    const g = out.getContext('2d');
+
+    function drawZzz(u) {
+      g.save();
+      g.font = 'bold 15px sans-serif';
+      g.lineWidth = 3;
+      g.strokeStyle = 'rgba(20,18,30,0.9)';
+      g.fillStyle = '#ffffff';
+      for (let i = 0; i < 3; i++) {
+        const k = (u + i / 3) % 1;
+        g.globalAlpha = Math.sin(k * Math.PI);
+        const x = 82 + k * 22 + i * 2;
+        const y = 70 - k * 46;
+        const size = 9 + k * 9;
+        g.font = `bold ${size}px sans-serif`;
+        g.strokeText('z', x, y);
+        g.fillText('z', x, y);
+      }
+      g.restore();
+    }
+
+    let cat = null;
+    window.setCoat = (coat) => {
+      if (cat) scene.remove(cat.root);
+      cat = buildCat(coat);
+      scene.add(cat.root);
+    };
+
+    // Returns PNG data URLs for one animation (one direction for directional ones).
+    window.renderAnim = (anim, dir) => {
+      const n = ANIMS[anim].frames;
+      // The curled-up sleeping cat lies side-on so its paws stay inside the frame.
+      const yaw = dir ? yawFor(dir) : anim === 'sleep' ? IDLE_YAW + 0.95 : IDLE_YAW;
+      const urls = [];
+      for (let i = 0; i < n; i++) {
+        const u = ANIMS[anim].loop ? i / n : i / (n - 1);
+        applyPose(cat, POSES[anim](u, yaw));
+        renderer.render(scene, camera);
+        g.clearRect(0, 0, S, S);
+        g.drawImage(renderer.domElement, 0, 0, S, S);
+        if (anim === 'sleep') drawZzz(u);
+        urls.push(out.toDataURL('image/png'));
+      }
+      return urls;
+    };
+
+    // A square portrait for app/tray icons.
+    window.renderIcon = (size) => {
+      applyPose(cat, POSES.sit(0.25, IDLE_YAW));
+      const c = document.createElement('canvas');
+      c.width = c.height = size;
+      renderer.render(scene, camera);
+      c.getContext('2d').drawImage(renderer.domElement, S * SS * 0.14, S * SS * 0.08, S * SS * 0.72, S * SS * 0.72, 0, 0, size, size);
+      return c.toDataURL('image/png');
+    };
+    window.ready = true;
+  </script>
+</body>
+</html>

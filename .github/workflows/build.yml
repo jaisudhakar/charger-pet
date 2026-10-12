@@ -1,0 +1,91 @@
+name: Build and release
+
+# Builds the Windows and macOS apps, the Linux AppImage and the GNOME extension, and
+# publishes them as GitHub Release v<package.json version>. Run it from the Actions tab
+# ("Run workflow") or by pushing a v* tag.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  app:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npx electron-builder --publish never
+        env:
+          # No code-signing certificate is configured; build unsigned installers.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cursor-cat-${{ runner.os }}
+          path: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.AppImage
+          if-no-files-found: error
+
+  gnome:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Package the GNOME extension (GNOME 45+, ginger cat)
+        run: |
+          ext=cursor-cat@jaisudhakar.github.io
+          mkdir -p out/ext/sprites
+          cp -r gnome/$ext/. out/ext/
+          cp sprites/ginger/*.png out/ext/sprites/
+          echo '{"coat": "ginger", "size": 72, "speed": 1}' > out/ext/config.json
+          (cd out/ext && zip -qr ../cursor-cat-gnome-extension.zip .)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cursor-cat-gnome
+          path: out/cursor-cat-gnome-extension.zip
+
+  release:
+    needs: [app, gnome]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v$(node -p "require('./package.json').version")"
+          ls -la artifacts
+          cat > notes.md <<'NOTES'
+          A 3D cat that chases your mouse pointer. When it catches up it sits, grooms, yawns and naps.
+
+          **Ubuntu** (GNOME, Wayland or X11). One command, then log out and back in:
+          ```bash
+          curl -fsSL https://raw.githubusercontent.com/jaisudhakar/charger-pet/HEAD/scripts/install-ubuntu.sh | bash
+          ```
+
+          **Windows**: download `Cursor.Cat.Setup.*.exe` and run it (SmartScreen: More info → Run anyway).
+
+          **macOS**: download the `.dmg` for your Mac (`arm64` = Apple Silicon, otherwise Intel), drag the app to Applications, then right-click it → Open the first time.
+
+          **Linux on X11, other desktops**: `Cursor.Cat-*.AppImage` (needs `xdotool`).
+          NOTES
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" artifacts/* --clobber
+          else
+            gh release create "$TAG" artifacts/* --target "$GITHUB_SHA" --title "Cursor Cat $TAG" --notes-file notes.md
+          fi

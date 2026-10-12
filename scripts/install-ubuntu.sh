@@ -1,64 +1,91 @@
 #!/usr/bin/env bash
-# Installs (or updates) Charger Pet on Ubuntu/Debian from the latest GitHub release,
-# makes sure the top bar can show app icons, and starts the cat.
+# Installs Cursor Cat on Ubuntu (GNOME): a cat that chases your mouse pointer.
+# No sudo needed. Works on Wayland and X11 (GNOME 42+, Ubuntu 22.04 and newer).
 #
 #   curl -fsSL https://raw.githubusercontent.com/jaisudhakar/charger-pet/HEAD/scripts/install-ubuntu.sh | bash
+#   … | bash -s -- smokey large      # cat: ginger|smokey|snowball  size: small|medium|large
 set -euo pipefail
 
 REPO="jaisudhakar/charger-pet"
+UUID="cursor-cat@jaisudhakar.github.io"
+COAT="${1:-ginger}"
+SIZE_NAME="${2:-medium}"
 
-arch="$(dpkg --print-architecture)"
-if [ "$arch" != "amd64" ]; then
-  echo "Sorry, only 64-bit Intel/AMD (amd64) builds are available; this machine is $arch." >&2
+case "$COAT" in
+  ginger|smokey|snowball) ;;
+  *) echo "Unknown cat '$COAT'. Use ginger, smokey or snowball." >&2; exit 1 ;;
+esac
+case "$SIZE_NAME" in
+  small) SIZE=56 ;;
+  medium) SIZE=72 ;;
+  large) SIZE=96 ;;
+  *) echo "Unknown size '$SIZE_NAME'. Use small, medium or large." >&2; exit 1 ;;
+esac
+
+if ! command -v gnome-shell >/dev/null 2>&1; then
+  echo "Cursor Cat for Ubuntu needs the GNOME desktop (Ubuntu's default desktop)." >&2
   exit 1
 fi
-
-echo "==> Finding the latest Charger Pet release…"
-url="$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" \
-  | grep -o '"browser_download_url": *"[^"]*_amd64\.deb"' | head -n1 | cut -d'"' -f4)"
-if [ -z "$url" ]; then
-  echo "Could not find a .deb in the latest release of $REPO." >&2
+version="$(gnome-shell --version | grep -oE '[0-9]+' | head -n1)"
+if [ "$version" -lt 42 ]; then
+  echo "GNOME $version is too old; Cursor Cat needs GNOME 42 or newer (Ubuntu 22.04+)." >&2
   exit 1
 fi
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
-chmod 755 "$tmp" # apt's sandbox user needs to read the package
 
-echo "==> Downloading $(basename "$url")…"
-curl -fL --progress-bar -o "$tmp/charger-pet.deb" "$url"
-chmod 644 "$tmp/charger-pet.deb"
-
-echo "==> Installing (you may be asked for your password)…"
-sudo apt-get install -y "$tmp/charger-pet.deb"
-
-# Ubuntu shows app icons in the top bar through the AppIndicator extension.
-relogin=0
-if command -v gnome-extensions >/dev/null 2>&1; then
-  if ! gnome-extensions list --enabled 2>/dev/null | grep -qi appindicator; then
-    uuid="$(gnome-extensions list 2>/dev/null | grep -i appindicator | head -n1 || true)"
-    if [ -z "$uuid" ]; then
-      echo "==> Installing top-bar icon support (AppIndicator extension)…"
-      sudo apt-get install -y gnome-shell-extension-appindicator
-      uuid="$(gnome-extensions list 2>/dev/null | grep -i appindicator | head -n1 || true)"
-      relogin=1
-    fi
-    if [ -n "$uuid" ]; then
-      echo "==> Turning on top-bar icon support ($uuid)…"
-      gnome-extensions enable "$uuid" || relogin=1
-    else
-      relogin=1
-    fi
-  fi
+# Use this checkout when run from the repository, otherwise download it.
+src=""
+if [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "${BASH_SOURCE[0]}" ]; then
+  here="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  [ -f "$here/gnome/$UUID/metadata.json" ] && src="$here"
+fi
+if [ -z "$src" ]; then
+  echo "==> Downloading Cursor Cat…"
+  curl -fsSL "https://codeload.github.com/$REPO/tar.gz/HEAD" | tar -xz -C "$tmp"
+  src="$(echo "$tmp"/*)"
 fi
 
-echo "==> Starting Charger Pet…"
-nohup charger-pet >/dev/null 2>&1 &
+extensions="$HOME/.local/share/gnome-shell/extensions"
+
+# Remove the earlier Charger Cat extension from this project, if present.
+OLD="charger-cat@jaisudhakar.github.io"
+if [ -d "$extensions/$OLD" ]; then
+  echo "==> Removing the old Charger Cat extension…"
+  gnome-extensions disable "$OLD" >/dev/null 2>&1 || true
+  rm -rf "${extensions:?}/$OLD"
+fi
+
+echo "==> Installing Cursor Cat for GNOME $version…"
+dest="$extensions/$UUID"
+rm -rf "$dest"
+mkdir -p "$dest/sprites"
+cp -r "$src/gnome/$UUID/." "$dest/"
+if [ "$version" -lt 45 ]; then
+  # GNOME 42–44 use the older extension format.
+  cp "$src/gnome/legacy/extension.js" "$src/gnome/legacy/metadata.json" "$dest/"
+fi
+cp "$src/sprites/$COAT/"*.png "$dest/sprites/"
+printf '{"coat": "%s", "size": %s, "speed": 1}\n' "$COAT" "$SIZE" > "$dest/config.json"
+
+echo "==> Turning it on…"
+gsettings set org.gnome.shell disable-user-extensions false
+enabled="$(gsettings get org.gnome.shell enabled-extensions)"
+enabled="$(printf '%s' "$enabled" | sed -E "s/, *'$OLD'|'$OLD', *|'$OLD'//")"
+if ! printf '%s' "$enabled" | grep -q "$UUID"; then
+  case "$enabled" in
+    "@as []"|"[]") enabled="['$UUID']" ;;
+    *) enabled="${enabled%]}, '$UUID']" ;;
+  esac
+fi
+gsettings set org.gnome.shell enabled-extensions "$enabled"
+gnome-extensions enable "$UUID" >/dev/null 2>&1 || true
 
 echo
-echo "Done! The cat window pops up for a few seconds, then the cat lives in the top bar"
-echo "next to the battery icon. Open it any time from your app menu: \"Charger Pet\"."
-if [ "$relogin" = 1 ]; then
-  echo
-  echo "Note: log out and back in once so the top bar can show the cat icon."
+if gnome-extensions info "$UUID" 2>/dev/null | grep -qiE 'state: *(active|enabled)'; then
+  echo "Done! Move your mouse: the cat chases the pointer."
+else
+  echo "Installed! Log out and log back in once, then move your mouse:"
+  echo "the cat chases the pointer, and naps when you leave it alone."
 fi
