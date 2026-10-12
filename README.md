@@ -17,6 +17,67 @@ battery is doing:
 Tap a hero to make it react, drag to look around the 3D scene, and use the dial to switch
 heroes. The browser-tab icon (favicon) and page title also show the live charge level.
 
+It comes in two forms:
+
+- **Desktop tray app** (Windows, macOS, Ubuntu/Linux): the pet lives in the top bar or
+  system tray, right next to the system battery icon.
+- **Web app / PWA** (phones and browsers): the full-screen 3D scene.
+
+## Desktop tray app
+
+![Tray icon frames](docs/tray-icon.png)
+
+The tray icon is a tiny 3D hero standing on a mini charge icon:
+
+- **Charging:** the hero dances, cheers, runs, spins and powers up, and a lightning bolt
+  pulses on the mini battery.
+- **On battery:** it chills and waves.
+- **Low battery:** the fill turns red and blinks, and the hero droops and naps.
+- **Plugging in:** the hero transforms into a random hero, and the full 3D scene pops up
+  next to the tray for a few seconds, then hides itself.
+
+The icon sits where each OS puts app icons:
+
+| OS | Where the pet appears | How to open the menu |
+|---|---|---|
+| Ubuntu / Linux | Top bar, with the other app indicators left of Wi-Fi, volume and battery | Click the pet |
+| macOS | Menu bar, next to the battery icon | Left-click opens the 3D scene, right-click the menu |
+| Windows | Taskbar system tray, near the battery icon (drag it out of the ^ overflow to keep it visible) | Left-click opens the 3D scene, right-click the menu |
+
+> No app can draw *inside* the system's own battery icon. Windows, macOS and GNOME don't
+> allow it. The pet sits right next to it, the same way RunCat does.
+
+The menu lets you pick any of the 10 heroes, transform at random, turn the plug-in pop-up
+and transform on or off, and start the pet at login.
+
+### Run from source
+
+```bash
+npm install
+npm run desktop
+```
+
+### Build installers
+
+```bash
+npm run dist:linux   # dist/*.AppImage and dist/*.deb (Ubuntu)
+npm run dist:win     # dist/*.exe   (run on Windows)
+npm run dist:mac     # dist/*.dmg   (run on macOS)
+```
+
+To build all three at once, open the repo's **Actions** tab and run **Build desktop app**.
+It builds on Windows, macOS and Ubuntu and attaches the installers to the run. Pushing a
+`v*` tag also triggers it.
+
+Notes:
+- **Ubuntu:** install with `sudo apt install ./charger-pet_*_amd64.deb`, or make the
+  `.AppImage` executable and run it. Stock Ubuntu shows tray icons out of the box. On
+  plain GNOME, install the *AppIndicator and KStatusNotifierItem Support* extension.
+- **Unsigned installers:** they aren't code-signed. On macOS, right-click the app →
+  **Open** the first time. On Windows, choose **More info → Run anyway** in SmartScreen.
+- **Battery:** the app reads the battery through Chromium on all three systems (UPower
+  on Linux). A desktop PC without a battery shows as 100% and plugged in.
+
 ## The Charge Squad (10 heroes)
 
 | # | Hero | Power | Particle effect |
@@ -36,7 +97,7 @@ All heroes are built in code from 3D primitives (cel shading, outlines, bloom gl
 They share one rig, so every hero can do all 13 activities: idle, wave, jump, backflip,
 dance, spin, run, power up, cheer, pump, stretch, sad and sleep.
 
-## Run it
+## Web app
 
 ```bash
 npm start          # serves the app at http://localhost:8080 (no install needed)
@@ -62,10 +123,6 @@ Firefox don't support the API, so the app switches to **demo mode** there. In de
 the **Plug in cable** button and the level slider in Settings simulate charging. You can
 also turn on demo mode yourself in Settings.
 
-> A web app can't draw over the phone's status-bar charging icon. To do that, the scene
-> would need to be wrapped in a native Android app (for example with Capacitor) that
-> shows it on the lock screen when the charger connects.
-
 ## Controls
 
 | Action | Input |
@@ -88,6 +145,9 @@ js/charger.js         3D battery/charge icon, plug, cable and energy orbs
 js/particles.js       GPU point-sprite particles
 js/battery.js         Battery Status API and demo simulator
 js/extras.js          live favicon, sound effects, screen wake lock
+desktop/main.js       Electron tray app: tray icon, menu, plug-in pop-up, login item
+desktop/tray.js       renders the animated tray icon frames and reads the battery
+desktop/preload.cjs   bridge between the tray app and its pages
 sw.js                 offline cache (PWA)
 vendor/three/         Three.js r170 (MIT), bundled so it works offline
 ```

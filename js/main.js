@@ -11,6 +11,9 @@ import { BatteryMonitor, formatDuration } from './battery.js';
 import { Favicon, Sfx, Awake } from './extras.js';
 
 const $ = (id) => document.getElementById(id);
+// Present when running inside the desktop (tray) app; see desktop/preload.cjs.
+const desktop = window.chargerPetDesktop;
+if (desktop) document.body.classList.add('desktop');
 const FOV = 36;
 
 // ---------------------------------------------------------------- settings
@@ -172,13 +175,14 @@ director.onActivity = (name, label) => {
 
 let transform = null; // { t, from, to }
 
-function switchHero(index, { animate = true } = {}) {
+function switchHero(index, { animate = true, remote = false } = {}) {
   index = (index + HEROES.length) % HEROES.length;
   if (index === heroIndex && rig) return;
   const to = getRig(HEROES[index].id);
   heroIndex = index;
   settings.hero = HEROES[index].id;
   saveSettings();
+  if (!remote) desktop?.heroChanged(settings.hero);
   updateHeroUI();
   if (!animate) {
     pet.remove(rig.root);
@@ -341,7 +345,7 @@ function onBattery(e) {
     const p = new THREE.Vector3(charger.terminalX + 0.2, charger.top - 0.7, 0);
     particles.burst(p, [0x3dff7a, 0xfff27a, 0xffffff], 50, 3);
     charger.bump(1.2);
-    if (settings.transformOnPlug && !firstSync) {
+    if (settings.transformOnPlug && !firstSync && !desktop) {
       let next = heroIndex;
       while (next === heroIndex) next = (Math.random() * HEROES.length) | 0;
       switchHero(next);
@@ -436,6 +440,11 @@ $('randomHero').addEventListener('click', () => {
   switchHero(n);
 });
 $('plugBtn').addEventListener('click', () => { sfx.unlock(); battery.toggleDemoPlug(); });
+desktop?.onSetHero((id) => {
+  const i = HEROES.findIndex((h) => h.id === id);
+  if (i >= 0) switchHero(i, { remote: true });
+});
+
 $('fullscreenBtn').addEventListener('click', () => {
   if (document.fullscreenElement) document.exitFullscreen?.();
   else document.documentElement.requestFullscreen?.().catch(() => {});
@@ -468,6 +477,7 @@ $('demoLevel').addEventListener('input', (e) => {
 
 window.addEventListener('keydown', (e) => {
   if (e.target instanceof HTMLInputElement) return;
+  if (e.key === 'Escape') desktop?.hidePopup();
   if (e.key === 'ArrowRight') switchHero(heroIndex + 1);
   else if (e.key === 'ArrowLeft') switchHero(heroIndex - 1);
   else if (e.key === ' ' || e.key.toLowerCase() === 'p') { battery.setDemo(true); $('optDemo').checked = settings.demo = true; battery.toggleDemoPlug(); }
@@ -657,7 +667,7 @@ async function start() {
 
 start();
 
-if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+if ('serviceWorker' in navigator && location.protocol !== 'file:' && !desktop) {
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
 }
 

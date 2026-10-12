@@ -4,8 +4,84 @@
   "description": "A 3D charging pet: ten animated heroes live on your charge icon and react when you plug in.",
   "private": true,
   "type": "module",
-  "scripts": {
-    "start": "node scripts/serve.mjs"
+  "main": "desktop/main.js",
+  "author": {
+    "name": "jaisudhakar"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "desktop": "electron .",
+    "dist": "electron-builder --publish never",
+    "dist:linux": "electron-builder --linux --publish never",
+    "dist:win": "electron-builder --win --publish never",
+    "dist:mac": "electron-builder --mac --publish never"
+  },
+  "devDependencies": {
+    "electron": "43.7.5",
+    "electron-builder": "26.16.1"
+  },
+  "build": {
+    "appId": "com.jaisudhakar.chargerpet",
+    "productName": "Charger Pet",
+    "files": [
+      "index.html",
+      "manifest.webmanifest",
+      "css/**",
+      "js/**",
+      "icons/**",
+      "vendor/**",
+      "desktop/**",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.entertainment",
+      "icon": "icons/icon-512.png",
+      "extendInfo": {
+        "LSUIElement": true
+      }
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "icons/icon-512.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility",
+      "icon": "icons/icon-512.png",
+      "maintainer": "jaisudhakar",
+      "synopsis": "Animated 3D pet in your top bar that reacts to charging",
+      "desktopName": "charger-pet.desktop",
+      "syncDesktopName": true
+    }
+  }
 }

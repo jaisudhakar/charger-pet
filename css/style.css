@@ -293,3 +293,8 @@ body[data-mode='charging'] .status::before { animation: blink 1s infinite; }
 @media (prefers-reduced-motion: reduce) {
   #scene { transition: none; }
 }
+
+/* Desktop pop-up window: the tray menu handles fullscreen and plug-in transforms. */
+body.desktop #fullscreenBtn,
+body.desktop .toggle:has(#optTransform) { display: none; }
+body.desktop .hud-top { -webkit-app-region: drag; }

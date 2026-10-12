@@ -245,7 +245,8 @@ export const POOLS = {
 const BLEND = 0.45;
 
 export class Director {
-  constructor() {
+  constructor({ pools = POOLS } = {}) {
+    this.pools = pools;
     this.mode = 'battery';
     this.current = null;
     this.t = 0;
@@ -277,7 +278,7 @@ export class Director {
   }
 
   next() {
-    const pool = POOLS[this.mode] ?? POOLS.battery;
+    const pool = this.pools[this.mode] ?? this.pools.battery;
     let pick = pool[(Math.random() * pool.length) | 0];
     for (let i = 0; i < 4 && pick === this.current; i++) pick = pool[(Math.random() * pool.length) | 0];
     this.play(pick);
