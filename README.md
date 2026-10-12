@@ -55,6 +55,17 @@ The icon sits where each OS puts app icons:
 The menu lets you pick a cat or any of the 10 heroes, transform at random, turn the
 plug-in pop-up and hero transform on or off, and start the pet at login.
 
+### Install
+
+**Ubuntu**: one command downloads, installs and starts it:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jaisudhakar/charger-pet/HEAD/scripts/install-ubuntu.sh | bash
+```
+
+**Windows / macOS**: download the installer from the
+[latest release](https://github.com/jaisudhakar/charger-pet/releases/latest).
+
 ### Run from source
 
 ```bash

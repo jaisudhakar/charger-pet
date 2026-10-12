@@ -35,3 +35,35 @@ jobs:
             dist/*.dmg
             dist/*.zip
           if-no-files-found: error
+
+  # On a v* tag, publish the installers as a GitHub Release so they have plain
+  # download links (no login, no zip).
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          ls -la artifacts
+          cat > notes.md <<'NOTES'
+          **Ubuntu** — one command:
+          ```bash
+          curl -fsSL https://raw.githubusercontent.com/jaisudhakar/charger-pet/HEAD/scripts/install-ubuntu.sh | bash
+          ```
+          or download `charger-pet_*_amd64.deb` below and run `sudo apt install ./charger-pet_*_amd64.deb`.
+
+          **Windows** — download `Charger.Pet.Setup.*.exe` and run it (SmartScreen: More info → Run anyway).
+
+          **macOS** — download the `.dmg` for your Mac (`arm64` = Apple Silicon, `x64` = Intel); the first time, right-click the app → Open.
+          NOTES
+          gh release create "$TAG" artifacts/* --repo "$GITHUB_REPOSITORY" --title "Charger Pet $TAG" --notes-file notes.md
