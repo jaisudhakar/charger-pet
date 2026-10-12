@@ -261,13 +261,13 @@ function applyLoginItem() {
           ? `"${process.env.APPIMAGE}"`
           : app.isPackaged ? `"${process.execPath}"` : `"${process.execPath}" "${ROOT}"`;
         fs.mkdirSync(dir, { recursive: true });
-        fs.writeFileSync(file, `[Desktop Entry]\nType=Application\nName=Charger Pet\nExec=${exec}\nX-GNOME-Autostart-enabled=true\n`);
+        fs.writeFileSync(file, `[Desktop Entry]\nType=Application\nName=Charger Pet\nExec=${exec} --hidden\nX-GNOME-Autostart-enabled=true\n`);
       } else if (fs.existsSync(file)) {
         fs.unlinkSync(file);
       }
     } catch {}
   } else {
-    app.setLoginItemSettings({ openAtLogin: settings.openAtLogin });
+    app.setLoginItemSettings({ openAtLogin: settings.openAtLogin, openAsHidden: true, args: ['--hidden'] });
   }
 }
 
@@ -304,7 +304,7 @@ ipcMain.on('pet:hero-changed', (e, id) => {
 ipcMain.on('pet:hide-popup', () => popup?.hide());
 
 // ------------------------------------------------------------------ app
-app.on('second-instance', () => showPopup());
+app.on('second-instance', () => showPopup()); // opening it again from the menu shows the cat
 app.on('window-all-closed', () => {}); // keep living in the tray
 app.on('before-quit', () => { app.isQuitting = true; });
 
@@ -326,5 +326,9 @@ app.whenReady().then(() => {
   nativeTheme.on('updated', () => {
     if (process.platform !== 'linux') spriteWin?.webContents.send('pet:theme', nativeTheme.shouldUseDarkColors);
   });
+  // Opening the app by hand shows the cat for a few seconds, so it is obvious the app is
+  // running even where the tray icon is hidden. Starting at login stays quiet in the tray.
+  const startedAtLogin = process.argv.includes('--hidden') || app.getLoginItemSettings().wasOpenedAsHidden;
   if (process.argv.includes('--show')) showPopup();
+  else if (!startedAtLogin) popup.webContents.once('did-finish-load', () => showPopup({ auto: true }));
 });

@@ -83,6 +83,21 @@ Notes:
 - **Battery:** the app reads the battery through Chromium on all three systems (UPower
   on Linux). A desktop PC without a battery shows as 100% and plugged in.
 
+### Cat not showing in the Ubuntu top bar?
+
+When you open Charger Pet from the app menu, the cat window pops up for a few seconds,
+then the cat stays in the top bar. If you don't see the window:
+
+1. **Check that it's running:** run `charger-pet` in a terminal. Any error it prints
+   explains why it can't start.
+2. **Check the top-bar icon support:** Ubuntu shows app icons through the *Ubuntu
+   AppIndicators* extension. Check it with `gnome-extensions list --enabled | grep -i appindicator`.
+   If nothing prints, turn it on with `gnome-extensions enable ubuntu-appindicators@ubuntu.com`
+   (or install `gnome-shell-extension-appindicator` on plain GNOME), then log out and back in.
+3. **Running from source** (`npm run desktop`) on Ubuntu 24.04 can fail with a "SUID
+   sandbox" error. Use the installed `.deb`, which sets up the needed AppArmor profile,
+   or run `npx electron . --no-sandbox` for a quick test.
+
 ## The cats
 
 | Cat | Look |
