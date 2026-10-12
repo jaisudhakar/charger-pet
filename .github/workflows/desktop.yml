@@ -1,7 +1,8 @@
 name: Build desktop app
 
-# Builds the tray app installers for Windows, macOS and Linux.
-# Run it from the Actions tab ("Run workflow") or by pushing a tag like v1.0.0.
+# Builds the tray app installers for Windows, macOS and Linux and publishes them as a
+# GitHub Release (tag v<package.json version>). Run it from the Actions tab
+# ("Run workflow") or by pushing a tag like v1.0.0.
 on:
   workflow_dispatch:
   push:
@@ -36,15 +37,15 @@ jobs:
             dist/*.zip
           if-no-files-found: error
 
-  # On a v* tag, publish the installers as a GitHub Release so they have plain
-  # download links (no login, no zip).
+  # Publish the installers as a GitHub Release so they have plain download links
+  # (no login, no zip). The tag is created on the built commit if it doesn't exist.
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v5
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -52,8 +53,8 @@ jobs:
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
         run: |
+          TAG="v$(node -p "require('./package.json').version")"
           ls -la artifacts
           cat > notes.md <<'NOTES'
           **Ubuntu** — one command:
@@ -66,4 +67,9 @@ jobs:
 
           **macOS** — download the `.dmg` for your Mac (`arm64` = Apple Silicon, `x64` = Intel); the first time, right-click the app → Open.
           NOTES
-          gh release create "$TAG" artifacts/* --repo "$GITHUB_REPOSITORY" --title "Charger Pet $TAG" --notes-file notes.md
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # Same version rebuilt: replace the files on the existing release.
+            gh release upload "$TAG" artifacts/* --clobber
+          else
+            gh release create "$TAG" artifacts/* --target "$GITHUB_SHA" --title "Charger Pet $TAG" --notes-file notes.md
+          fi
