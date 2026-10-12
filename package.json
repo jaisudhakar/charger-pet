@@ -1,0 +1,11 @@
+{
+  "name": "charger-pet",
+  "version": "1.0.0",
+  "description": "A 3D charging pet: ten animated heroes live on your charge icon and react when you plug in.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node scripts/serve.mjs"
+  },
+  "license": "MIT"
+}
