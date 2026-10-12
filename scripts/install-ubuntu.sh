@@ -67,6 +67,11 @@ if [ "$version" -lt 45 ]; then
   cp "$src/gnome/legacy/extension.js" "$src/gnome/legacy/metadata.json" "$dest/"
 fi
 cp "$src/sprites/$COAT/"*.png "$dest/sprites/"
+# Newer GNOME releases than this version lists: allow the running one too (the
+# extension only uses long-stable GNOME Shell APIs).
+if ! grep -q "\"$version\"" "$dest/metadata.json"; then
+  sed -i "s/\"shell-version\": \[/\"shell-version\": [ \"$version\",/" "$dest/metadata.json"
+fi
 printf '{"coat": "%s", "size": %s, "speed": 1}\n' "$COAT" "$SIZE" > "$dest/config.json"
 
 echo "==> Turning it on…"

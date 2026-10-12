@@ -1,6 +1,6 @@
 // Cursor Cat desktop app (Windows, macOS, Linux on X11): a small transparent,
 // click-through window that holds the cat and follows the mouse pointer.
-import { app, BrowserWindow, Tray, Menu, nativeImage, screen } from 'electron';
+import { app, BrowserWindow, Tray, Menu, nativeImage, screen, dialog } from 'electron';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
@@ -15,11 +15,11 @@ const COAT_NAMES = { ginger: 'Ginger', smokey: 'Smokey', snowball: 'Snowball' };
 const TICK_MS = 16;
 const DEBUG = !!process.env.CURSOR_CAT_DEBUG;
 
-// Wayland doesn't let apps place windows or read the global pointer; run through
-// XWayland instead. (On Ubuntu's GNOME, the Cursor Cat GNOME extension works better.)
-if (process.platform === 'linux' && process.env.XDG_SESSION_TYPE === 'wayland') {
-  app.commandLine.appendSwitch('ozone-platform', 'x11');
-}
+// Wayland doesn't let apps place their windows or read the global pointer, so this app
+// can't work there; on Ubuntu's GNOME the Cursor Cat GNOME extension is used instead.
+const WAYLAND = process.platform === 'linux' && (process.env.XDG_SESSION_TYPE === 'wayland' || !!process.env.WAYLAND_DISPLAY);
+const GNOME = /gnome/i.test(process.env.XDG_CURRENT_DESKTOP ?? '');
+const INSTALL_URL = 'https://raw.githubusercontent.com/jaisudhakar/charger-pet/HEAD/scripts/install-ubuntu.sh';
 
 if (!app.requestSingleInstanceLock()) app.quit();
 
@@ -253,8 +253,53 @@ app.on('second-instance', () => {
   }
 });
 
-app.whenReady().then(() => {
+// On a Wayland desktop no app can see the pointer outside its own windows, so the cat
+// can't follow it. On GNOME (Ubuntu) offer to install the desktop extension instead.
+async function waylandGate() {
+  if (!WAYLAND) return true;
+  if (!GNOME) {
+    await dialog.showMessageBox({
+      type: 'warning',
+      title: 'Cursor Cat',
+      message: 'Cursor Cat can\'t follow the mouse on this Wayland desktop.',
+      detail: 'Wayland doesn\'t let apps see the mouse pointer. Log in with an X11 session (and install xdotool), then start Cursor Cat again.',
+      buttons: ['Quit'],
+    });
+    return false;
+  }
+  const { response } = await dialog.showMessageBox({
+    type: 'info',
+    title: 'Cursor Cat',
+    message: 'On Ubuntu, Cursor Cat runs as part of the desktop.',
+    detail: 'Ubuntu (Wayland) doesn\'t let apps see the mouse pointer, so this app version can\'t follow it. '
+      + 'Install the Ubuntu version instead: it takes a few seconds and needs no password. '
+      + 'Afterwards, log out and log back in once.',
+    buttons: ['Install for Ubuntu', 'Quit'],
+    defaultId: 0,
+    cancelId: 1,
+  });
+  if (response !== 0) return false;
+  const local = join(HERE, '..', 'scripts', 'install-ubuntu.sh');
+  const args = fs.existsSync(local) ? [local, settings.coat] : ['-c', `curl -fsSL ${INSTALL_URL} | bash -s -- ${settings.coat}`];
+  const result = await new Promise((done) => {
+    execFile('bash', args, { timeout: 120000 }, (err, stdout, stderr) => done({ err, out: `${stdout}\n${stderr}`.trim() }));
+  });
+  await dialog.showMessageBox({
+    type: result.err ? 'error' : 'info',
+    title: 'Cursor Cat',
+    message: result.err ? 'The Ubuntu version could not be installed.' : 'Installed! Log out and log back in once.',
+    detail: result.err ? result.out.slice(-1500) : 'After logging back in, move your mouse: the cat chases the pointer.',
+    buttons: ['OK'],
+  });
+  return false;
+}
+
+app.whenReady().then(async () => {
   loadSettings();
+  if (!(await waylandGate())) {
+    app.quit();
+    return;
+  }
   app.dock?.hide();
   tray = new Tray(trayIcon());
   tray.setToolTip('Cursor Cat');

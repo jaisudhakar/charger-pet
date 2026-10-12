@@ -75,7 +75,7 @@ const metadata = (versions) => `${JSON.stringify({
 const ext = new URL(`gnome/${uuid}/`, repo);
 await mkdir(ext, { recursive: true });
 await writeFile(new URL('extension.js', ext), modern);
-await writeFile(new URL('metadata.json', ext), metadata(['45', '46', '47', '48', '49']));
+await writeFile(new URL('metadata.json', ext), metadata(['45', '46', '47', '48', '49', '50', '51']));
 await mkdir(new URL('gnome/legacy/', repo), { recursive: true });
 await writeFile(new URL('gnome/legacy/extension.js', repo), legacy);
 await writeFile(new URL('gnome/legacy/metadata.json', repo), metadata(['42', '43', '44']));

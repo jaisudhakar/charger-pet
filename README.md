@@ -24,6 +24,9 @@ Then **log out and log back in once**. No sudo is needed.
 - **Choose a cat and size:** `… | bash -s -- smokey large`. Cats are `ginger`, `smokey` or `snowball`; sizes are `small`, `medium` or `large`.
 - **Remove it:** `curl -fsSL https://raw.githubusercontent.com/jaisudhakar/charger-pet/HEAD/scripts/uninstall-ubuntu.sh | bash`
 
+Not seeing the cat after logging back in? Run this and send the output when asking for help:
+`curl -fsSL https://raw.githubusercontent.com/jaisudhakar/charger-pet/HEAD/scripts/check-ubuntu.sh | bash`
+
 On Ubuntu the cat is a GNOME Shell extension, part of the desktop itself. That's why it can
 follow the pointer under Wayland, where normal apps aren't allowed to see the pointer
 outside their own windows. It needs GNOME 42 or newer (Ubuntu 22.04+).
