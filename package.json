@@ -1,7 +1,7 @@
 {
   "name": "charger-pet",
   "version": "1.0.0",
-  "description": "A 3D charging pet: ten animated heroes live on your charge icon and react when you plug in.",
+  "description": "A 3D charging pet: a RunCat-style cat (and ten heroes) living next to your battery icon, reacting when you plug in.",
   "private": true,
   "type": "module",
   "main": "desktop/main.js",
@@ -10,6 +10,11 @@
     "name": "jaisudhakar"
   },
   "license": "MIT",
+  "homepage": "https://github.com/jaisudhakar/charger-pet",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jaisudhakar/charger-pet.git"
+  },
   "scripts": {
     "start": "node scripts/serve.mjs",
     "desktop": "electron .",
