@@ -18,3 +18,19 @@ gnome-extensions info "$UUID" 2>&1 | sed 's/^/  /'
 echo "--- recent GNOME Shell errors about the extension ---"
 journalctl --user -b --no-pager -o cat 2>/dev/null | grep -iE "cursor-cat|cursor cat|CursorCat" | tail -n 15 | sed 's/^/  /'
 journalctl -b --no-pager -o cat /usr/bin/gnome-shell 2>/dev/null | grep -iE "cursor-cat|CursorCat" | tail -n 15 | sed 's/^/  /'
+echo "--- what to do ---"
+info="$(gnome-extensions info "$UUID" 2>&1)"
+if [ ! -f "$dir/extension.js" ]; then
+  echo "  Cursor Cat is not installed (or was removed). Install it, then log out and back in:"
+  echo "  curl -fsSL https://raw.githubusercontent.com/jaisudhakar/charger-pet/HEAD/scripts/install-ubuntu.sh | bash"
+elif ! gsettings get org.gnome.shell enabled-extensions 2>/dev/null | grep -q "$UUID"; then
+  echo "  Installed but switched off. Run the install command again, then log out and back in."
+elif printf '%s' "$info" | grep -qi "doesn't exist\|does not exist"; then
+  echo "  Installed and switched on, but GNOME hasn't loaded it yet: log out and log back in."
+elif printf '%s' "$info" | grep -qiE "failed to connect|not running|cannot autolaunch|no such interface"; then
+  echo "  Couldn't reach GNOME Shell. Run this check from a terminal inside your Ubuntu desktop."
+elif printf '%s' "$info" | grep -qiE 'state: *(active|enabled)'; then
+  echo "  Cursor Cat is running. Move the mouse; the cat chases the pointer."
+else
+  echo "  GNOME reports a problem (see the info and errors above). Send this whole output."
+fi
