@@ -1,0 +1,14 @@
+{
+  "uuid": "charger-cat@jaisudhakar.github.io",
+  "name": "Charger Cat",
+  "description": "A 3D cat runs next to the battery icon in the top bar while your charger is plugged in, and sits purring when the battery is full.",
+  "shell-version": [
+    "45",
+    "46",
+    "47",
+    "48",
+    "49"
+  ],
+  "url": "https://github.com/jaisudhakar/charger-pet",
+  "version": 1
+}

@@ -23,6 +23,36 @@ It comes in two forms:
   system tray, right next to the system battery icon.
 - **Web app / PWA** (phones and browsers): the full-screen 3D scene.
 
+## Charger Cat for Ubuntu (recommended)
+
+![Cat running next to the Ubuntu battery icon while charging](docs/topbar-cat.gif)
+
+A GNOME Shell extension that puts the cat **right next to Ubuntu's own battery icon**.
+There's no separate app and no second battery icon. It reads the same charger state as
+GNOME's battery indicator (UPower).
+
+![What the top bar shows in each battery state](docs/topbar-states.png)
+
+| Battery | Cat |
+|---|---|
+| Charging (⚡) | Runs next to the battery icon |
+| Full, still plugged in | Sits beside it and wags its tail |
+| Unplugged | Hidden |
+
+Install (no sudo needed), then **log out and back in once**:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jaisudhakar/charger-pet/HEAD/scripts/install-gnome-cat.sh | bash
+```
+
+Pick another cat by adding its name: `… | bash -s -- smokey` (grey) or `… | bash -s -- snowball` (white).
+To remove it: `curl -fsSL https://raw.githubusercontent.com/jaisudhakar/charger-pet/HEAD/scripts/uninstall-gnome-cat.sh | bash`.
+
+Works on GNOME 42–49 (Ubuntu 22.04 and newer). The extension lives in
+[`gnome-extension/`](gnome-extension/). Its frames are rendered from the 3D cat with
+`scripts/render-cat-frames.mjs`, and `scripts/build-gnome-extension.mjs` builds
+`extension.js` from `gnome-extension/src/core.js`.
+
 ## Desktop tray app
 
 ![Cat running in the top bar while charging](docs/tray-cat.gif)
